@@ -12,7 +12,7 @@
 #Obfuscator_Parameters=/striponly /sci 1 /mo
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 ;#AutoIt3Wrapper_run_debug_mode=Y
-Opt("TrayIconDebug", 1) ;0=no info, 1=debug line info
+;Opt("TrayIconDebug", 1) ;0=no info, 1=debug line info
 #Region ****#~ endfunc_comment=1
 ;Directives created by AutoIt3Wrapper_GUI * * * *
 #~ endfunc_comment=1
@@ -30,11 +30,11 @@ Opt("TrayIconDebug", 1) ;0=no info, 1=debug line info
 #include "_Excel_Rewrite.au3"
 #include <_Array2D.au3>
 ;#include <_Excel_Rewrite.au3>
-
+TraySetState(1)
 $temp = @ScriptDir & '\temp\INFO.ini'
 $temp = IniReadSection($temp, 'Server')
 Global $serverfile = SetServer($temp, 'xlsxfile'), $serverIP = SetServer($temp, 'ServerIP'), $QueryPort = SetServer($temp, 'queryport'), $QueryTransfer = SetServer($temp, 'querytransfer')
-Global $QueryVituralServer = SetServer($temp, 'queryvituralserver'), $QueryUser = SetServer($temp, 'queryuser'), $QueryPass = SetServer($temp, 'querypass')
+Global $QueryVituralServer = SetServer($temp, 'queryvituralserver'), $QueryUser = SetServer($temp, 'queryuser'), $QueryPass = SetServer($temp, 'querypass'), $Start = TimerInit()
 
 Func SetServer(ByRef $iniA, $c)
 	Local $this = $iniA, $a[1][1]
@@ -72,11 +72,14 @@ EndFunc   ;==>SetServer
 
 Func __LogWrite($file, $text, $mode)
 	Local $Ram = ProcessGetStats()
-	_FileWriteLog($file, Int($Ram[0] / 1048576) & "MB | " & Int($Ram[1] / 1048576) & 'MB ' & $text, $mode)
+	TraySetToolTip(Int($Ram[0] / 1048576) & "MB " & $text)
+	_FileWriteLog($file, Int($Ram[0] / 1048576) & "MB | " & Int($Ram[1] / 1048576) & 'MB ' & TimerDiff($Start) & ' ' & $text, $mode)
 	FileClose($file)
+	Global $Start = TimerInit()
 EndFunc   ;==>__LogWrite
 
 main()
+Opt("TrayIconHide", 1)
 ;IndexExcel()
 
 Func main()
@@ -226,11 +229,34 @@ Func main()
 	;Sleep(5000)
 EndFunc   ;==>main
 Func IndexExcel(ByRef $c)
-	Do
-		ObjGet("", "Excel.Application")
-		$temp = @error
-		Sleep(100)
-	Until $temp <> 0
+	$oEx = 0
+	OnAutoItExitRegister('_CloseExcel')
+	$oBook = _Excel_BookAttach($serverfile)
+	If @error Then
+		$oEx = _Excel_Open(False, Default, Default, Default, True)
+		Sleep(500)
+		$oBook = _Excel_BookOpen($oEx, $serverfile, False, True)
+	ElseIf $oBook.Application.Visible = False Then
+		$oBook = 0
+		TraySetToolTip('[ExcelIndex] Wait for other process to finish!')
+		TraySetIcon('warning')
+		ProcessWaitClose(ProcessExists('EXCEL.EXE'), 60 * 30)
+		$temp = ObjGet("", "Excel.Application")
+		If IsObj($temp) And ObjName($temp, 1) <> "_Application" Then
+			For $oWorkbook In $temp.Workbooks
+				If Not $temp.Saved Then
+					$temp.Save()
+				EndIf
+			Next
+			$temp.Quit()
+			$temp = 0
+		EndIf
+		TraySetIcon()
+		TraySetToolTip()
+		$oEx = _Excel_Open(False)
+		Sleep(500)
+		$oBook = _Excel_BookOpen($oEx, $serverfile, False, True)
+	EndIf
 	;----$table		=|CLID	   |Full name|Last connect|Clan
 	;----$table1	=|Collumn|CLID	   |Short name	|Clan
 	;----$header	=|CLID	   |Full name|Clan		|N
@@ -315,9 +341,20 @@ Func IndexExcel(ByRef $c)
 	_Excel_RangeWrite($oBook, 3, $table1, 'A3:D' & (UBound($table1) + 2))
 	;If @error Then MsgBox(0, '', @error)
 	_Excel_BookSave($oBook)
-	_Excel_BookClose($oBook)
-	_Excel_Close($oEx)
-
+	If Not ($oBook.Application.Visible) Then
+		_Excel_BookClose($oBook)
+		_Excel_Close($oEx)
+	EndIf
+	OnAutoItExitUnRegister('_CloseExcel')
+	$oEx = 0
 
 EndFunc   ;==>IndexExcel
 
+Func _CloseExcel()
+	If @exitCode < 3 Then
+		Local $oBook = _Excel_BookAttach($serverfile)
+		If Not @error Then
+			_Excel_BookClose($oBook)
+		EndIf
+	EndIf
+EndFunc   ;==>_CloseExcel

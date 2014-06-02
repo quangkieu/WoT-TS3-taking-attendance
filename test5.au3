@@ -4,8 +4,8 @@
 #AutoIt3Wrapper_Compression=4
 #AutoIt3Wrapper_Res_Fileversion=1.0.0.0
 #AutoIt3Wrapper_AU3Check_Parameters=-w 1
-#AutoIt3Wrapper_Run_Before="C:\Users\kieuq\Desktop\software\new folder (2)\ShowOriginalLine.exe" %in%
-#AutoIt3Wrapper_Run_After="C:\Users\kieuq\Desktop\software\new folder (2)\ShowOriginalLine.exe" %in%
+#AutoIt3Wrapper_Run_Before=".\software\new folder (2)\ShowOriginalLine.exe" %in%
+#AutoIt3Wrapper_Run_After=".\software\new folder (2)\ShowOriginalLine.exe" %in%
 #AutoIt3Wrapper_Run_Tidy=y
 #Tidy_Parameters=/sci 1
 #AutoIt3Wrapper_Run_Obfuscator=y
@@ -13,13 +13,13 @@
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 ;396046237
 ;Ca5cad3
-#AutoIt3Wrapper_run_debug_mode=Y
+;#AutoIt3Wrapper_run_debug_mode=Y
 #Region ****#~ endfunc_comment=1
 ;Directives created by AutoIt3Wrapper_GUI * * * *
 #~ endfunc_comment=1
 #EndRegion ****#~ endfunc_comment=1
 ;#RequireAdmin
-Opt("TrayIconDebug", 1)
+
 #include <MsgBoxConstants.au3>
 #include <JSMN.au3>
 #include <IE.au3>
@@ -34,7 +34,7 @@ Opt("TrayIconDebug", 1)
 #include <_Excel_Rewrite.au3>
 #include "C:\Users\kieuq\Desktop\software\new folder (2)\_AutoItErrorTrap.au3"
 ;#include 'TS3.au3'
-
+TraySetState(1)
 Global $clan = [['A', 1000002504],['R', 1000001787],['C', 1000006228]]
 Global $oIE = _IECreateEmbedded()
 TCPStartup()
@@ -43,10 +43,11 @@ $temp = IniReadSection($temp, 'Server')
 Global $serverfile = SetServer($temp, 'xlsxfile'), $serverIP = SetServer($temp, 'ServerIP'), $QueryPort = SetServer($temp, 'queryport'), $QueryTransfer = SetServer($temp, 'querytransfer')
 Global $QueryVituralServer = SetServer($temp, 'queryvituralserver'), $QueryUser = SetServer($temp, 'queryuser'), $QueryPass = SetServer($temp, 'querypass')
 Global $ChannelUpload = SetServer($temp, 'channelupload'), $ChannelPass = SetServer($temp, 'channelpass'), $ChannelFolder = SetServer($temp, 'channelfolder')
-Global $MainSocket = TCPConnect($serverIP, $QueryPort)
+Global $MainSocket = TCPConnect($serverIP, $QueryPort), $Start = TimerInit()
 If @error Then Exit
+;Opt("TrayIconDebug", 1)
 Start2()
-
+Opt("TrayIconHide", 1)
 Func SetServer(ByRef $iniA, $c)
 	Local $this = $iniA, $a[1][1]
 	$c = StringLower($c)
@@ -89,8 +90,11 @@ EndFunc   ;==>SetServer
 
 Func __LogWrite($file, $text, $mode)
 	Local $Ram = ProcessGetStats()
-	_FileWriteLog($file, Int($Ram[0] / 1048576) & "MB | " & Int($Ram[1] / 1048576) & 'MB ' & $text, $mode)
+	TraySetToolTip(Int($Ram[0] / 1048576) & "MB " & $text)
+	;TrayTip(Int($Ram[0] / 1048576) & "MB ", Int($Ram[0] / 1048576) & "MB ", 5)
+	_FileWriteLog($file, Int($Ram[0] / 1048576) & "MB | " & Int($Ram[1] / 1048576) & 'MB ' & TimerDiff($Start) & ' ' & $text, $mode)
 	FileClose($file)
+	Global $Start = TimerInit()
 EndFunc   ;==>__LogWrite
 
 Func _ArrayDeleteCol(ByRef $avWork, $iCol)
@@ -248,11 +252,12 @@ Func Example(ByRef $c)
 		If @error Then MsgBox(0, '', @error)
 		$oIE = _IECreateEmbedded()
 		$small = GUICreate('', 0, 0, 0, 0, $WS_OVERLAPPEDWINDOW + $WS_CLIPSIBLINGS + $WS_CLIPCHILDREN)
-		Sleep(10)
+		Sleep(1000)
 		$this = GUICtrlCreateObj($oIE, 0, 0, 0, 0)
 		GUISetState(@SW_HIDE)
+		__LogWrite(FileOpen(@ScriptDir & "\temp\AutomationLog.log", 9), '[Last24] Refresh ' & $i & '/' & $Data[0][0] & '.', 1)
 		_IENavigate($oIE, 'http://www.noobmeter.com/player/na/' & $aTableData[$i][1] & '/' & $aTableData[$i][0], 0)
-		Sleep(10)
+		Sleep(1000)
 	Next
 	__LogWrite(FileOpen(@ScriptDir & "\temp\AutomationLog.log", 9), '[Last24] Download ' & $c & '.', 1)
 	For $i = 1 To $Data[0][0]
@@ -274,6 +279,7 @@ Func Example(ByRef $c)
 				$temp = $temp - 1
 			EndIf
 		Next
+		__LogWrite(FileOpen(@ScriptDir & "\temp\AutomationLog.log", 9), '[Last24] Downloading ' & $Data[0][0] - $temp & '/' & $Data[0][0] & '.', 1)
 		;GUICtrlSetData($lable1,$Data[0][0]-$temp&'/'&$Data[0][0]&' files. Next retry '&120-_Timer_Diff($begin)/1000&' seconds')
 		ConsoleWrite(@CR & @LF & '====================' & @CR & @LF)
 		Sleep(1000)
@@ -287,6 +293,7 @@ Func Example(ByRef $c)
 				EndIf
 			Next
 			ConsoleWrite('start new' & @CR & @LF)
+			__LogWrite(FileOpen(@ScriptDir & "\temp\AutomationLog.log", 9), '[Last24] Start new download.', 1)
 			$begin = _Timer_Init()
 		EndIf
 	Until $temp = 0
@@ -473,14 +480,35 @@ Func Example(ByRef $c)
 	;$oTable = _IETableGetCollection($oIE, 1)
 	;$aTableData = _IETableWriteToArray($oTable, True)
 	If $CmdLine[0] > 1 Then ProcessWaitClose($cmdline[2])
-	Do
-		ObjGet("", "Excel.Application")
-		$temp = @error
-		Sleep(100)
-	Until $temp <> 0
+	$oEx = 0
+	OnAutoItExitRegister('_CloseExcel')
+	$oBook = _Excel_BookAttach($serverfile)
+	If @error Then
+		$oEx = _Excel_Open(False, Default, Default, Default, True)
+		Sleep(500)
+		$oBook = _Excel_BookOpen($oEx, $serverfile, False, True)
+	ElseIf $oBook.Application.Visible = False Then
+		$oBook = 0
+		TraySetToolTip('[Last24h] Wait for other process to finish!')
+		TraySetIcon('warning')
+		ProcessWaitClose(ProcessExists('EXCEL.EXE'), 60 * 30)
+		$temp = ObjGet("", "Excel.Application")
+		If IsObj($temp) And ObjName($temp, 1) <> "_Application" Then
+			For $oWorkbook In $temp.Workbooks
+				If Not $temp.Saved Then
+					$temp.Save()
+				EndIf
+			Next
+			$temp.Quit()
+			$temp = 0
+		EndIf
+		TraySetIcon()
+		TraySetToolTip()
+		$oEx = _Excel_Open(False)
+		Sleep(500)
+		$oBook = _Excel_BookOpen($oEx, $serverfile, False, True)
+	EndIf
 	__LogWrite(FileOpen(@ScriptDir & "\temp\AutomationLog.log", 9), '[Last24] Write Excel ' & $c & '.', 1)
-	$oEx = _Excel_Open(False)
-	$oBook = _Excel_BookOpen($oEx, $serverfile, False, True)
 	ConsoleWrite(@error & ' line:' & @ScriptLineNumber & @CRLF)
 	$table1 = _Excel_RangeRead($oBook, 3, 'A3:D' & _Excel_RangeRead($oBook, 3, 'A1') + 3)
 	;_ArrayDisplay($table1)
@@ -524,13 +552,16 @@ Func Example(ByRef $c)
 						ElseIf (StringInStr($temp1[0][0], @MON & '/' & @MDAY & '/' & @YEAR) <> 0 And StringRegExp($temp1[0][0], '\|' & $aTableData[$i][1] & '$') = 0) Then
 							__LogWrite(FileOpen(@ScriptDir & "\temp\AutomationLog.log", 9), '[Last24] Write Excel case ' & $temp & ' 1-3-2 [' & $temp1[0][0] & ',' & $temp1[0][1] & '].', 1)
 							_Excel_RangeWrite($oBook, 3, @WDAY & '|' & @MON & '/' & @MDAY & '/' & @YEAR & '|' & $aTableData[$i][1], $temp & $k)
+						ElseIf $temp1[0][0] = '' And $temp1[0][1] = '' Then
+							__LogWrite(FileOpen(@ScriptDir & "\temp\AutomationLog.log", 9), '[Last24] Write Excel case ' & $temp & ' 1-3-3 [' & $temp1[0][0] & ',' & $temp1[0][1] & '].', 1)
+							_Excel_RangeWrite($oBook, 3, @WDAY & '|' & @MON & '/' & @MDAY & '/' & @YEAR & '|' & $aTableData[$i][1], $temp & $k - 1)
 						EndIf
 
 					EndIf
 				ElseIf (StringInStr($temp1[0][0], @MON & '/' & @MDAY & '/' & @YEAR) <> 0 And StringRegExp($temp1[1][0], '\|' & $aTableData[$i][1] & '$') = 0) Then
 					__LogWrite(FileOpen(@ScriptDir & "\temp\AutomationLog.log", 9), '[Last24] Write Excel case ' & $temp & ' 2 [[' & $temp1[0][0] & ',' & $temp1[0][1] & '],[' & $temp1[1][0] & ',' & $temp1[1][1] & ']].', 1)
 					_Excel_RangeWrite($oBook, 3, @WDAY & '|' & @MON & '/' & @MDAY & '/' & @YEAR & '|' & $aTableData[$i][1], $temp & '3')
-				ElseIf StringInStr($temp1[0][0], @MON & '/' & @MDAY & '/' & @YEAR) = 0 Or $temp1[0][1] < $starttime Then
+				ElseIf StringInStr($temp1[0][0], @MON & '/' & @MDAY & '/' & @YEAR) = 0 Or $temp1[0][1] < $starttime Or ($temp1[0][1] = '' And StringInStr($temp1[0][0], @MON & '/' & @MDAY & '/' & @YEAR) = 0) Then
 					InsertNewLine($oBook, $table1, $temp)
 					__LogWrite(FileOpen(@ScriptDir & "\temp\AutomationLog.log", 9), '[Last24] Write Excel case ' & $temp & ' 3 [[' & $temp1[0][0] & ',' & $temp1[0][1] & '],[' & $temp1[1][0] & ',' & $temp1[1][1] & ']].', 1)
 					_Excel_RangeWrite($oBook, 3, @WDAY & '|' & @MON & '/' & @MDAY & '/' & @YEAR & '|' & $aTableData[$i][1], $temp & '3')
@@ -539,8 +570,12 @@ Func Example(ByRef $c)
 		EndIf
 	Next
 	_Excel_BookSave($oBook)
-	_Excel_BookClose($oBook)
-	_Excel_Close($oEx)
+	If Not ($oBook.Application.Visible) Then
+		_Excel_BookClose($oBook)
+		_Excel_Close($oEx)
+	EndIf
+	OnAutoItExitUnRegister('_CloseExcel')
+	$oEx = 0
 	__LogWrite(FileOpen(@ScriptDir & "\temp\AutomationLog.log", 9), '[Last24] Write 24h log ' & $c & '.', 1)
 	$serverfile = FileOpen(@ScriptDir & '\temp\SNS_' & $c & '\SNS_' & $c & '_' & @YEAR & '-' & @MON & '-' & @MDAY & '.txt', 10)
 	FileWriteLine($serverfile, '***Range of error: 5 hours***')
@@ -634,6 +669,7 @@ Func Start2()
 	If _ArraySearch($clan, $kk, 0, 0, 0, 0, 1, 0) = -1 Then
 		TCPCloseSocket($MainSocket)
 		TCPShutdown()
+		Opt("TrayIconHide", 1)
 		Exit
 	EndIf
 	DirCreate(@ScriptDir & '\temp\')
@@ -682,6 +718,16 @@ Func Start2()
 	ConsoleWrite('End ' & $kk)
 
 EndFunc   ;==>Start2
+
+Func _CloseExcel()
+	If @exitCode < 3 Then
+		Local $oBook = _Excel_BookAttach($serverfile)
+		If Not @error Then
+			_Excel_BookClose($oBook)
+		EndIf
+	EndIf
+EndFunc   ;==>_CloseExcel
+
 ;Example('A')
 ;~ ; ===================================================================
 ;~ ; JSON UDF's
